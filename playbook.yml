@@ -1,0 +1,103 @@
+- hosts: localhost
+  connection: local
+  vars:
+    
+
+  tasks:
+    
+    -   name: Check the version of Release
+        command: hostnamectl
+        register: os_check
+        ignore_errors: yes
+
+    -   name: Install Role Java
+        local_action: command ansible-galaxy install -f geerlingguy.java 
+
+    -   name: Check if Java is already installed
+        stat: path=/usr/sbin/jdk
+        register: jdk_exists
+
+    -   name: Applying role Java
+        command: mv ~/.ansible/roles/geerlingguy.java ~/.ansible/roles/pwslab.java
+        when: not jdk_exists.stat.exists
+        ignore_errors: yes
+
+    -   name: Installing Java
+        include_role:
+            name: pwslab.java
+        when: 
+            - os_check.stdout | regex_search("CentOS Linux 7")
+            - not os_check.stdout | regex_search("CentOS Linux 8")
+        vars:
+            java_packages:
+                - java-11-openjdk
+
+    -   name: Remove Old Java Any
+        yum:
+            name: java*
+            state: absent
+        when: 
+            - os_check.stdout | regex_search("CentOS Linux 8")
+
+    -   name: Install Java 11
+        yum:
+            name: java-11-openjdk-devel
+            state: latest
+        when: 
+            - os_check.stdout | regex_search("CentOS Linux 8")
+
+    -   name: Installing Java
+        include_role:
+            name: pwslab.java
+        when: 
+            - os_check.stdout | regex_search("Ubuntu")
+
+
+    -   name: Adding source entry of Cassandra - Ubuntu
+        apt_repository:
+            repo: deb http://downloads.apache.org/cassandra/debian 40x main
+            state: present
+            filename: webmin
+            update_cache: no
+        when: 
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Add repo entry - CentOS
+        yum_repository:
+            name: cassandra
+            description: Apache Cassandra
+            baseurl: https://downloads.apache.org/cassandra/redhat/40x/
+            gpgcheck: yes
+            repo_gpgcheck: yes
+            gpgkey: https://downloads.apache.org/cassandra/KEYS
+            file: cassandra
+        when: 
+            - os_check.stdout | regex_search("CentOS")
+
+    -   name: Add an Apt signing key - Ubuntu
+        apt_key:
+            url: https://downloads.apache.org/cassandra/KEYS
+            state: present
+        when: 
+            - os_check.stdout | regex_search("Ubuntu")
+
+
+    -   name: Install Cassandra - Ubuntu
+        apt: 
+            name: cassandra
+            state: present
+            update_cache: yes
+        when: 
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Install Cassandra - CentOS
+        yum: 
+            name: cassandra
+            state: present
+        when: 
+            - os_check.stdout | regex_search("CentOS")
+
+
+    
+
+    
